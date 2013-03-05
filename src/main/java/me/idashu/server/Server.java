@@ -27,9 +27,6 @@ public class Server implements Runnable{
     @Override
     public void run() {
 
-//        new Thread(new SessionHandle()).start();
-//        new Thread(new SessionHandle()).start();
-
         try {
             selector = Selector.open();
 
@@ -68,14 +65,6 @@ public class Server implements Runnable{
                         ThreadPool.getInstance().execute(handle);
                         // 取消注册
                         key.cancel();
-
-//                        Session session = new Session(key);
-//                        try {
-//                            SessionQueue.getInstance().put(session);
-//                            key.cancel();
-//                        } catch (InterruptedException e) {
-//                            e.printStackTrace();
-//                        }
 
                     }
 
