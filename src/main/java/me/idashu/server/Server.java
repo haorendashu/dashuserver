@@ -49,23 +49,14 @@ public class Server implements Runnable{
                     SelectionKey key = it.next();
                     it.remove();
 
-                    if ((key.interestOps() & SelectionKey.OP_ACCEPT) == SelectionKey.OP_ACCEPT) {
-
-                        ServerSocketChannel server = (ServerSocketChannel) key.channel();
-                        SocketChannel sc = server.accept();
-                        sc.configureBlocking(false);
-                        sc.register(selector, SelectionKey.OP_READ);
-
-                        System.out.println("accept");
-
-                    } else if ((key.interestOps() & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
-
+                    if (key.isAcceptable()) {
                         Session session = new Session(key);
-                        AnalyseHandle handle = new AnalyseHandle(session);
-                        ThreadPool.getInstance().execute(handle);
-                        // 取消注册
-                        key.cancel();
-
+                        System.out.println("access");
+                    } else if (key.isReadable()) {
+                        key.interestOps(0);
+                        Session session = (Session) key.attachment();
+                        AnalyseHandle analyseHandle = new AnalyseHandle(session);
+                        ThreadPool.getInstance().execute(analyseHandle);
                     }
 
                 }

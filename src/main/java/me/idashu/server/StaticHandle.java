@@ -2,6 +2,7 @@ package me.idashu.server;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -31,40 +32,29 @@ public class StaticHandle extends Handle {
         SocketChannel channel = session.getChannel();
         if (!channel.isOpen())
             return;
-        // buffer
-        ByteBuffer bb = ByteBuffer.allocate(1024);
-        bb.clear();
 
-        File file = new File(staticPath);
-
+        File file = new File(Sysconst.ROOTPATH, session.getRequestPath());
+        FileChannel from = null;
         try {
-            if (file.exists()) {
-                StringBuffer sb = new StringBuffer();
-                sb.append("HTTP/1.1 200 OK").append(Session.CRLF);
-                sb.append("Content-Type:").append(Session.CRLF);
-                sb.append("Content-Length: ").append(file.length()).append(Session.CRLF);
-                sb.append(Session.CRLF);
+            from = new FileInputStream(file).getChannel();
+            ByteBuffer bb = ByteBuffer.allocate(1024);
+            bb.clear();
 
-                bb.clear();
-                bb.put(sb.toString().getBytes());
-                bb.flip();
+            // 返回头信息
+            StringBuffer sb = new StringBuffer();
+            sb.append("HTTP/1.1 200 OK").append(Sysconst.CRLF);
+            sb.append("Content-Type: ").append(session.getMime()).append(Sysconst.CRLF);
+            sb.append("Content-Length: ").append(file.length()).append(Sysconst.CRLF);
+            sb.append(Sysconst.CRLF);
+            System.out.println(sb.toString());
+            bb.put(sb.toString().getBytes());
+            bb.flip();
+            channel.write(bb);
 
-                channel.write(bb);
-
-                FileInputStream fis = new FileInputStream(file);
-                FileChannel fc = fis.getChannel();
-                bb.clear();
-                int count = 0;
-                while((count = fc.read(bb))!=-1){
-                    bb.flip();
-                    channel.write(bb);
-                    bb.clear();
-                }
-
-            } else {
-                // 404
-
-            }
+            bb = from.map(FileChannel.MapMode.READ_ONLY, 0, from.size());
+            channel.write(bb);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         } finally {

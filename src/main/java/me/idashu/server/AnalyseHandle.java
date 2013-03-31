@@ -24,91 +24,75 @@ public class AnalyseHandle extends Handle {
 
     @Override
     public void run() {
-
-        // 获取channel
-        SocketChannel channel = session.getChannel();
-        if (!channel.isOpen())
-            return;
-        // buffer
-        ByteBuffer bb = ByteBuffer.allocate(1024);
-        bb.clear();
-        // 用来保存读取的请求信息
+        SocketChannel sc = (SocketChannel) session.getKey().channel();
+        session.setChannel(sc);
+        // 请求信息
         StringBuffer headSB = new StringBuffer();
-
+        ByteBuffer bb = ByteBuffer.allocate(1024);
         int count = 0;
 
-        // 开始读取请求信息
         try {
+            // 读取请求头信息
             while (true) {
                 bb.clear();
-                count = channel.read(bb);
-
-                // 已经读完
+                count = sc.read(bb);
                 if (count == 0) {
                     break;
                 }
-                // 连接已断开
-                if (count == -1) {
+                if (count < 0) {
+                    // 连接已经中断
                     session.close();
                     return;
                 }
+                bb.flip();
+                byte[] data = new byte[count];
+                bb.get(data, 0, count);
+                headSB.append(new String(data));
+            }
+//            System.out.println("head:\n"+headSB.toString().trim());
+            // 解析请求
+            StringTokenizer st = new StringTokenizer(headSB.toString(), Sysconst.CRLF);
 
-                headSB.append(new String(bb.array()));
+            String line = st.nextToken();
+
+            // 请求方法路径等
+            StringTokenizer http = new StringTokenizer(line, " ");
+            session.setMethod(http.nextToken()); // 方法
+
+            String get = http.nextToken();
+            int index = get.indexOf('?');
+            if (index > 0) {
+                session.setRequestPath(get.substring(0, index)); // 路径
+//                path = decoder.decode(get.substring(0, index), "UTF-8");
+//                parameters = get.substring(index + 1);
+            } else {
+                session.setRequestPath(get);
+//                path = decoder.decode(get, "UTF-8");
+//                parameters = null;
             }
 
-            System.out.println("head:"+headSB.toString());
+            line = st.nextToken();
 
-            // 读取完请求信息，切分，放到请求头队列里面
-            String[] headStrs = headSB.toString().split(Session.CRLF);
-            LinkedList<String> headList = session.getHeadList();
-            for (String tempStr : headStrs) {
-                headList.add(tempStr);
-            }
-
-            // 分析头信息
-            String tempStr = headList.poll();
-            String[] urls = tempStr.split(" ");
-            String[] strs = urls[1].split("/");
-
-            // 加上index.html
-//            if (strs.length == 0) {
-//                strs = new String[]{"index.html"};
-//            }
-            String[] tempStrs = strs[strs.length-1].split("\\.");
-//            if (tempStrs.length == 0) {
-//                strs = Arrays.copyOf(strs, strs.length+1);
-//                strs[strs.length-1] = "index.html";
-//                tempStrs = new String[]{"index","html"};
-//            }
-            // 加上index.html over
-            String mime = Mime.get(tempStrs[1]);
-            session.setMime(mime);
-
-            if(tempStrs[1].equals("do")){
-                // 后缀为".do"的请求是请求java
-
-            }else{
-                // 静态请求
-                StringBuffer filePathSB = new StringBuffer();
-                filePathSB.append(Session.ROOTPATH);
-                for (int i = 0; i < strs.length; i++) {
-                    filePathSB.append(File.separator);
-                    filePathSB.append(strs[i]);
+            while (line != null && !line.equals("")) {
+                int colon = line.indexOf(":");
+                if (colon > -1) {
+                    String key = line.substring(0, colon).toLowerCase();
+                    String value = line.substring(colon + 1).trim();
+                    session.head(key, value);
                 }
-                System.out.println(filePathSB.toString());
-
-                StaticHandle handle = new StaticHandle(session);
-                handle.setStaticPath(filePathSB.toString());
-                ThreadPool.getInstance().execute(handle);
+                if (st.hasMoreElements()) {
+                    line = st.nextToken();
+                } else {
+                    break;
+                }
             }
+
+            StaticHandle sh = new StaticHandle(session);
+            ThreadPool.getInstance().execute(sh);
 
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println("handle session error");
-            session.close();
-            return;
         }
-
     }
 
 }
