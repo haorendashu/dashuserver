@@ -54,7 +54,22 @@ public class StaticHandle extends Handle {
             bb = from.map(FileChannel.MapMode.READ_ONLY, 0, from.size());
             channel.write(bb);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            // 404
+            ByteBuffer bb = ByteBuffer.allocate(1024);
+            bb.clear();
+            StringBuffer sb = new StringBuffer();
+            sb.append("HTTP/1.1 404 Not Found").append(Sysconst.CRLF);
+            sb.append("Content-Type: ").append("text/html").append(Sysconst.CRLF);
+            sb.append(Sysconst.CRLF);
+            sb.append("404");
+            bb.put(sb.toString().getBytes());
+            bb.flip();
+            try {
+                channel.write(bb);
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+            sb.append(Sysconst.CRLF);
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
